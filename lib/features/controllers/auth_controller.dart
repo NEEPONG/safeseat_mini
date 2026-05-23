@@ -8,12 +8,12 @@ class AuthController {
 
   AuthController(this.context);
 
-  Future<bool> login(String phone, String password) async {
+  Future<Map<String, dynamic>?> login(String phone, String password) async {
     if (phone.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
       );
-      return false;
+      return null;
     }
 
     try {
@@ -36,14 +36,14 @@ class AuthController {
             context,
           ).showSnackBar(const SnackBar(content: Text('เข้าสู่ระบบสำเร็จ')));
         }
-        return true;
+        return responseData['user'] as Map<String, dynamic>? ?? {};
       } else {
         if (context.mounted) {
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text(responseData['error'] ?? 'เข้าสู่ระบบไม่สำเร็จ')));
         }
-        return false;
+        return null;
       }
     } catch (error) {
       if (context.mounted) {
@@ -51,7 +51,7 @@ class AuthController {
           const SnackBar(content: Text('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์')),
         );
       }
-      return false;
+      return null;
     }
   }
 

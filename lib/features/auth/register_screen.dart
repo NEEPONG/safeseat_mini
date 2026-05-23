@@ -127,7 +127,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -222,7 +222,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   backgroundColor: AppTheme.primaryColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   elevation: 5,
-                  shadowColor: AppTheme.primaryColor.withOpacity(0.5),
+                  shadowColor: AppTheme.primaryColor.withValues(alpha: 0.5),
                 ),
                 child: const Text('ดำเนินการต่อ', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               ),
@@ -364,7 +364,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   backgroundColor: AppTheme.primaryColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   elevation: 5,
-                  shadowColor: AppTheme.primaryColor.withOpacity(0.5),
+                  shadowColor: AppTheme.primaryColor.withValues(alpha: 0.5),
                 ),
                 child: _isLoading 
                   ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))

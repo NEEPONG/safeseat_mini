@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
+import 'package:safeseat_mini/features/auth/register_screen.dart';
 import 'package:safeseat_mini/features/controllers/auth_controller.dart';
-import 'package:safeseat_mini/features/auth/screens/register_screen.dart';
+import 'package:safeseat_mini/features/main_layout/main_layout.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,19 +23,22 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     final authController = AuthController(context);
-    final success = await authController.login(
+    final userData = await authController.login(
       _phoneController.text,
       _passwordController.text,
     );
 
-    if (success && mounted) {
-      // Navigate to HomeScreen later
-    }
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+    if (userData != null && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => MainLayout(user: userData)),
+      );
+    } else {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -109,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withOpacity(0.1),
+                              color: AppTheme.primaryColor.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -145,7 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withOpacity(0.1),
+                              color: AppTheme.primaryColor.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -191,7 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         elevation: 5,
-                        shadowColor: AppTheme.primaryColor.withOpacity(0.5),
+                        shadowColor: AppTheme.primaryColor.withValues(alpha: 0.5),
                       ),
                       child: _isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
