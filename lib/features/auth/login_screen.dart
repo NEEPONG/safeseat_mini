@@ -1,46 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
 import 'package:safeseat_mini/features/auth/register_screen.dart';
-import 'package:safeseat_mini/features/controllers/auth_controller.dart';
 import 'package:safeseat_mini/features/main_layout/main_layout.dart';
+import 'package:safeseat_mini/core/controllers/auth_controller.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _isLoading = false;
-
-  Future<void> _login() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    final authController = AuthController(context);
-    final userData = await authController.login(
-      _phoneController.text,
-      _passwordController.text,
-    );
-
-    if (userData != null && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => MainLayout(user: userData)),
-      );
-    } else {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
 
   @override
   void dispose() {
@@ -49,96 +25,136 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void _login() async {
+    if (_formKey.currentState!.validate()) {
+      // Hide keyboard
+      FocusScope.of(context).unfocus();
+
+      final errorMsg = await ref
+          .read(authControllerProvider.notifier)
+          .login(_phoneController.text, _passwordController.text);
+
+      if (mounted) {
+        if (errorMsg == null) {
+          // Success
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('เข้าสู่ระบบสำเร็จ')));
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const MainLayout()),
+          );
+        } else {
+          // Error
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(errorMsg)));
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isLoading = ref.watch(authControllerProvider);
+
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 40.0,
+            ),
+            child: Form(
+              key: _formKey,
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: const BoxDecoration(
+                  const SizedBox(height: 40),
+                  const Center(
+                    child: Icon(
+                      Icons.security,
+                      size: 80,
                       color: AppTheme.primaryColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.verified_user_outlined,
-                      color: Colors.white,
-                      size: 40,
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // App Name
+                  const SizedBox(height: 40),
                   const Text(
-                    'SAFE SEAT',
+                    'ยินดีต้อนรับกลับมา!',
                     style: TextStyle(
                       fontSize: 28,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.bold,
                       color: Color(0xFF1E293B),
-                      letterSpacing: 1.5,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-
-                  // Subtitle
                   const Text(
-                    'บริการผู้ขับขี่แทนทั่วไทย',
+                    'กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ',
                     style: TextStyle(fontSize: 16, color: Color(0xFF64748B)),
+                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 48),
 
-                  // Phone Input
+                  // Phone Field
                   Container(
                     decoration: BoxDecoration(
-                      color: AppTheme.inputColor,
+                      color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    child: TextField(
+                    child: TextFormField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
                       decoration: InputDecoration(
-                        hintText: 'เบอร์มือถือ',
+                        hintText: 'เบอร์โทรศัพท์',
                         hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
                         prefixIcon: Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                              color: AppTheme.primaryColor.withValues(
+                                alpha: 0.1,
+                              ),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
-                              Icons.phone,
+                              Icons.phone_outlined,
                               color: AppTheme.primaryColor,
-                              size: 18,
+                              size: 20,
                             ),
                           ),
                         ),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
                           vertical: 16,
                         ),
                       ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'กรุณากรอกเบอร์โทรศัพท์';
+                        }
+                        if (value.length != 10) {
+                          return 'เบอร์โทรศัพท์ต้องมี 10 หลัก';
+                        }
+                        return null;
+                      },
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
-                  // Password Input
+                  // Password Field
                   Container(
                     decoration: BoxDecoration(
-                      color: AppTheme.inputColor,
+                      color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    child: TextField(
+                    child: TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       decoration: InputDecoration(
@@ -149,13 +165,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                              color: AppTheme.primaryColor.withValues(
+                                alpha: 0.1,
+                              ),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
-                              Icons.lock,
+                              Icons.lock_outline,
                               color: AppTheme.primaryColor,
-                              size: 18,
+                              size: 20,
                             ),
                           ),
                         ),
@@ -165,7 +183,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ? Icons.visibility_off
                                 : Icons.visibility,
                             color: const Color(0xFF94A3B8),
-                            size: 20,
                           ),
                           onPressed: () {
                             setState(() {
@@ -175,7 +192,30 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
                           vertical: 16,
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'กรุณากรอกรหัสผ่าน';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Forgot Password
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {},
+                      child: const Text(
+                        'ลืมรหัสผ่าน?',
+                        style: TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -184,42 +224,43 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // Login Button
                   SizedBox(
-                    width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _isLoading ? null : _login,
+                      onPressed: isLoading ? null : _login,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryColor,
-                        foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
                         elevation: 5,
-                        shadowColor: AppTheme.primaryColor.withValues(alpha: 0.5),
+                        shadowColor: AppTheme.primaryColor.withValues(
+                          alpha: 0.5,
+                        ),
                       ),
-                      child: _isLoading
+                      child: isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
                           : const Text(
                               'เข้าสู่ระบบ',
                               style: TextStyle(
+                                color: Colors.white,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 40),
 
                   // Register Link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                        'ยังไม่ได้สมัครสมาชิกหรอ? ',
+                        'ยังไม่มีบัญชี? ',
                         style: TextStyle(color: Color(0xFF64748B)),
                       ),
-                      GestureDetector(
-                        onTap: () {
+                      TextButton(
+                        onPressed: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -228,10 +269,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           );
                         },
                         child: const Text(
-                          'สมัครที่นี่.',
+                          'สมัครสมาชิก',
                           style: TextStyle(
                             color: AppTheme.primaryColor,
                             fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
                       ),

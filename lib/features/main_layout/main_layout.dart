@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
 import 'package:safeseat_mini/features/home/home_screen.dart';
 import 'package:safeseat_mini/features/profile/profile_screen.dart';
+import 'package:safeseat_mini/core/controllers/user_controller.dart';
 
-class MainLayout extends StatefulWidget {
-  final Map<String, dynamic> user;
-
-  const MainLayout({super.key, required this.user});
+class MainLayout extends ConsumerStatefulWidget {
+  const MainLayout({super.key});
 
   @override
-  State<MainLayout> createState() => _MainLayoutState();
+  ConsumerState<MainLayout> createState() => _MainLayoutState();
 }
 
-class _MainLayoutState extends State<MainLayout> {
+class _MainLayoutState extends ConsumerState<MainLayout> {
   int _currentIndex = 0;
 
   late final List<Widget> _screens;
@@ -21,15 +21,22 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     _screens = [
-      HomeScreen(user: widget.user),
+      const HomeScreen(),
       const Center(child: Text('History Screen')), // Placeholder
       const Center(child: Text('Wallet Screen')), // Placeholder
-      ProfileScreen(user: widget.user),
+      const ProfileScreen(),
     ];
   }
 
   @override
   Widget build(BuildContext context) {
+    // We can read user here if needed for global layout things
+    final user = ref.watch(userProvider);
+
+    if (user == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: Container(
@@ -49,13 +56,11 @@ class _MainLayoutState extends State<MainLayout> {
               _currentIndex = index;
             });
           },
+          type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
           selectedItemColor: AppTheme.primaryColor,
-          unselectedItemColor: const Color(0xFF94A3B8),
-          showSelectedLabels: true,
+          unselectedItemColor: Colors.grey,
           showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
           items: const [
             BottomNavigationBarItem(
               icon: Padding(
