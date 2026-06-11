@@ -219,7 +219,9 @@ class _SelectLocationScreenState extends ConsumerState<SelectLocationScreen> {
 
     try {
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
       
       final latLng = LatLng(position.latitude, position.longitude);

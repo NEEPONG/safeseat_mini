@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeseat_mini/core/controllers/user_controller.dart';
 import 'package:safeseat_mini/core/controllers/profile_controller.dart';
 import 'package:safeseat_mini/core/models/car_model.dart';
-import 'package:safeseat_mini/core/models/cartype_model.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -181,7 +180,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           ),
                           hint: const Text('ประเภทรถ'),
-                          value: selectedCarType,
+                          initialValue: selectedCarType,
                           items: carTypes.map((type) {
                             return DropdownMenuItem(
                               value: type.carTypeId,

@@ -9,6 +9,10 @@ import 'package:safeseat_mini/core/models/car_model.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
 import 'package:safeseat_mini/core/services/route_service.dart';
 import 'package:safeseat_mini/features/request_driver/screens/payment_method_screen.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:safeseat_mini/core/constants/api_constants.dart';
+import 'package:safeseat_mini/features/request_driver/screens/waiting_driver_screen.dart';
 
 class RequestDriverDetailsScreen extends ConsumerStatefulWidget {
   const RequestDriverDetailsScreen({super.key});
@@ -26,6 +30,9 @@ class _RequestDriverDetailsScreenState
   String _paymentMethod = 'เงินสด';
   final MapController _mapController = MapController();
   List<LatLng> _routePoints = [];
+  double _estimatedPrice = 300.0;
+  double _distanceInKm = 0.0;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -42,22 +49,41 @@ class _RequestDriverDetailsScreenState
 
     if (pickup == null || dropoff == null) return;
 
-
-
-    final points = await RouteService.getRoutePoints(pickup, dropoff);
+    final routeDetails = await RouteService.getRouteDetails(pickup, dropoff);
 
     if (mounted) {
+      double calculatedPrice = 300.0;
+      double distanceKm = 0.0;
+      List<LatLng> points = [pickup, dropoff];
+
+      if (routeDetails != null) {
+        points = routeDetails.points.isNotEmpty ? routeDetails.points : [pickup, dropoff];
+        distanceKm = routeDetails.distance / 1000.0;
+        calculatedPrice = 300.0 + (distanceKm * 10.0);
+      } else {
+        // Fallback using straight-line distance if API fails
+        final distanceMeters = const Distance().as(LengthUnit.Meter, pickup, dropoff);
+        distanceKm = distanceMeters / 1000.0;
+        calculatedPrice = 300.0 + (distanceKm * 10.0);
+      }
+
       setState(() {
-        _routePoints = points.isNotEmpty ? points : [pickup, dropoff]; // fallback to straight line
+        _routePoints = points;
+        _estimatedPrice = calculatedPrice;
+        _distanceInKm = distanceKm;
       });
 
-      // Fit map bounds to show both pins and the route
-      _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: LatLngBounds(pickup, dropoff),
-          padding: const EdgeInsets.symmetric(horizontal: 50.0, vertical: 50.0),
-        ),
-      );
+      // Fit map bounds to show both pins and the route, ensuring non-zero area
+      if (pickup.latitude != dropoff.latitude || pickup.longitude != dropoff.longitude) {
+        _mapController.fitCamera(
+          CameraFit.bounds(
+            bounds: LatLngBounds(pickup, dropoff),
+            padding: const EdgeInsets.symmetric(horizontal: 50.0, vertical: 50.0),
+          ),
+        );
+      } else {
+        _mapController.move(pickup, 15.0);
+      }
     }
   }
 
@@ -505,7 +531,7 @@ class _RequestDriverDetailsScreenState
                             ),
                             Switch.adaptive(
                               value: _ladyMode,
-                              activeColor: const Color(0xFFEC4899),
+                              activeThumbColor: const Color(0xFFEC4899),
                               onChanged: (val) {
                                 setState(() {
                                   _ladyMode = val;
@@ -654,20 +680,33 @@ class _RequestDriverDetailsScreenState
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Estimated Price Row
-                  const Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'ยอดรวมโดยประมาณ',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF64748B),
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'ยอดรวมโดยประมาณ',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                          if (_distanceInKm > 0)
+                            Text(
+                              'ระยะทาง ${_distanceInKm.toStringAsFixed(1)} กม.',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                        ],
                       ),
                       Text(
-                        '฿450.00',
-                        style: TextStyle(
+                        '฿${_estimatedPrice.toStringAsFixed(0)}',
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.primaryColor,
@@ -682,43 +721,86 @@ class _RequestDriverDetailsScreenState
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        // Submit ride request details action
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            title: const Row(
-                              children: [
-                                Icon(Icons.bolt, color: Colors.amber),
-                                SizedBox(width: 8),
-                                Text('เรียกคนขับสำเร็จ!'),
-                              ],
-                            ),
-                            content: const Text(
-                              'ระบบบันทึกข้อมูลเรียกรถเรียบร้อยแล้ว กำลังรอคนขับกดยอมรับงานสักครู่...',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop(); // pop dialog
-                                  Navigator.of(context).pop(); // pop details
-                                  Navigator.of(
-                                    context,
-                                  ).pop(); // pop map screen (return to home)
-                                },
-                                child: const Text('ตกลง'),
+                      onPressed: _selectedCar == null || _isSubmitting
+                          ? null
+                          : () async {
+                              setState(() {
+                                _isSubmitting = true;
+                              });
+
+                              try {
+                                final url = Uri.parse('${ApiConstants.baseUrl}/api/user/request');
+                                final response = await http.post(
+                                  url,
+                                  headers: {'Content-Type': 'application/json'},
+                                  body: jsonEncode({
+                                    'dropofflatitude': reqState.dropoffLatLng?.latitude,
+                                    'dropofflongitude': reqState.dropoffLatLng?.longitude,
+                                    'isladymode': _ladyMode,
+                                    'note': _remarksController.text.trim(),
+                                    'paymentmethod': _paymentMethod,
+                                    'pickuplatitude': reqState.pickupLatLng?.latitude,
+                                    'pickuplongitude': reqState.pickupLatLng?.longitude,
+                                    'reqdistance': _distanceInKm,
+                                    'requestfee': _estimatedPrice,
+                                    'user_id': phoneNo,
+                                    'user_car_id': _selectedCar?.userCarId,
+                                  }),
+                                );
+
+                                if (response.statusCode == 201) {
+                                  final data = jsonDecode(response.body);
+                                  final request = data['request'];
+                                  final int? requestId = request != null ? request['requestid'] as int? : null;
+
+                                  if (requestId != null) {
+                                    if (context.mounted) {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (context) => WaitingDriverScreen(
+                                            requestId: requestId,
+                                            pickupAddress: reqState.pickupAddress ?? 'ตำแหน่งปัจจุบัน',
+                                            dropoffAddress: reqState.dropoffAddress ?? 'ปลายทาง',
+                                            carDetails: '${_selectedCar!.carBrand} ${_selectedCar!.carModel}',
+                                            price: _estimatedPrice,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    throw Exception('ไม่พบไอดีคำขอจากการตอบกลับ');
+                                  }
+                                } else {
+                                  final errData = jsonDecode(response.body);
+                                  throw Exception(errData['error'] ?? 'เกิดข้อผิดพลาดในการสร้างคำขอ');
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('ไม่สามารถส่งคำขอเรียกรถได้: $e')),
+                                  );
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() {
+                                    _isSubmitting = false;
+                                  });
+                                }
+                              }
+                            },
+                      icon: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
-                            ],
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.bolt, color: Colors.white),
-                      label: const Text(
-                        'เรียกคนขับ',
-                        style: TextStyle(
+                            )
+                          : const Icon(Icons.bolt, color: Colors.white),
+                      label: Text(
+                        _isSubmitting ? 'กำลังส่งคำขอ...' : 'เรียกคนขับ',
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
