@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeseat_mini/core/controllers/user_controller.dart';
 import 'package:safeseat_mini/core/controllers/profile_controller.dart';
+import 'package:safeseat_mini/core/models/car_model.dart';
+import 'package:safeseat_mini/core/models/cartype_model.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -19,6 +25,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   int? _selectedGender;
   String? _profileImagePath;
+  File? _selectedImage;
+  bool _isUploadingImage = false;
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -44,29 +63,187 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   void _saveProfile() async {
     if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isUploadingImage = true;
+      });
+
       final currentUser = ref.read(userProvider);
       if (currentUser == null) return;
+      
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      final navigator = Navigator.of(context);
+
+      String? newImagePath = _profileImagePath;
+
+      if (_selectedImage != null) {
+        try {
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final fileName = '${currentUser.phoneNo}_$timestamp.jpg';
+          
+          await Supabase.instance.client.storage
+              .from('userimages')
+              .upload(fileName, _selectedImage!);
+
+          newImagePath = Supabase.instance.client.storage
+              .from('userimages')
+              .getPublicUrl(fileName);
+        } catch (e) {
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(content: Text('อัปโหลดรูปภาพไม่สำเร็จ')),
+          );
+          setState(() {
+            _isUploadingImage = false;
+          });
+          return;
+        }
+      }
 
       final updatedUser = currentUser.copyWith(
         name: _nameController.text,
         email: _emailController.text,
         gender: _selectedGender,
         mainAddress: _addressController.text,
+        profileImagePath: newImagePath,
       );
 
       final success = await ref.read(profileControllerProvider.notifier).editProfile(updatedUser);
 
       if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           const SnackBar(content: Text('บันทึกข้อมูลเรียบร้อยแล้ว')),
         );
-        Navigator.pop(context);
+        navigator.pop();
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           const SnackBar(content: Text('บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่')),
         );
+        setState(() {
+          _isUploadingImage = false;
+        });
       }
     }
+  }
+
+  void _showAddCarDialog() {
+    final currentUser = ref.read(userProvider);
+    if (currentUser == null) return;
+
+    final brandCtrl = TextEditingController();
+    final modelCtrl = TextEditingController();
+    final colorCtrl = TextEditingController();
+    final plateCtrl = TextEditingController();
+    int? selectedCarType;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: Consumer(
+            builder: (context, ref, child) {
+              final carTypesAsync = ref.watch(carTypeProvider);
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'เพิ่มยานพาหนะใหม่',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0044C9)),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(controller: brandCtrl, icon: Icons.branding_watermark, hintText: 'ยี่ห้อ (เช่น Toyota)'),
+                  _buildTextField(controller: modelCtrl, icon: Icons.car_repair, hintText: 'รุ่น (เช่น Camry)'),
+                  _buildTextField(controller: colorCtrl, icon: Icons.color_lens, hintText: 'สีรถ (เช่น ดำ)'),
+                  _buildTextField(controller: plateCtrl, icon: Icons.pin, hintText: 'ทะเบียนรถ (เช่น กค 1234)'),
+                  
+                  carTypesAsync.when(
+                    data: (carTypes) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                        ),
+                        child: DropdownButtonFormField<int>(
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.category, color: Colors.grey),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          ),
+                          hint: const Text('ประเภทรถ'),
+                          value: selectedCarType,
+                          items: carTypes.map((type) {
+                            return DropdownMenuItem(
+                              value: type.carTypeId,
+                              child: Text(type.carTypeName),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            selectedCarType = val;
+                          },
+                        ),
+                      );
+                    },
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (err, stack) => const Text('Failed to load car types'),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E293B),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        if (brandCtrl.text.isEmpty || modelCtrl.text.isEmpty || colorCtrl.text.isEmpty || plateCtrl.text.isEmpty || selectedCarType == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')));
+                          return;
+                        }
+
+                        final newCar = CarModel(
+                          userCarId: 0,
+                          carBrand: brandCtrl.text,
+                          carColor: colorCtrl.text,
+                          carModel: modelCtrl.text,
+                          carPlate: plateCtrl.text,
+                          carType: selectedCarType!,
+                          userId: currentUser.phoneNo,
+                        );
+
+                        final scaffoldMessenger = ScaffoldMessenger.of(context);
+                        final navigator = Navigator.of(context);
+                        final success = await ref.read(profileControllerProvider.notifier).addUserCar(newCar);
+                        if (success && mounted) {
+                          navigator.pop();
+                          scaffoldMessenger.showSnackBar(const SnackBar(content: Text('เพิ่มรถสำเร็จ')));
+                        } else if (mounted) {
+                          scaffoldMessenger.showSnackBar(const SnackBar(content: Text('เกิดข้อผิดพลาดในการเพิ่มรถ')));
+                        }
+                      },
+                      child: const Text('บันทึกยานพาหนะ', style: TextStyle(color: Colors.white, fontSize: 16)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -106,14 +283,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         CircleAvatar(
                           radius: 50,
                           backgroundColor: Colors.grey[300],
-                          backgroundImage:
-                              _profileImagePath != null &&
-                                  _profileImagePath!.isNotEmpty
-                              ? NetworkImage(_profileImagePath!)
-                              : null,
-                          child:
-                              (_profileImagePath == null ||
-                                  _profileImagePath!.isEmpty)
+                          backgroundImage: _selectedImage != null
+                              ? FileImage(_selectedImage!)
+                              : (_profileImagePath != null && _profileImagePath!.isNotEmpty
+                                  ? NetworkImage(_profileImagePath!)
+                                  : null) as ImageProvider?,
+                          child: (_selectedImage == null && (_profileImagePath == null || _profileImagePath!.isEmpty))
                               ? const Icon(
                                   Icons.person,
                                   size: 60,
@@ -124,7 +299,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         Positioned(
                           right: 0,
                           bottom: 0,
-                          child: Container(
+                          child: GestureDetector(
+                            onTap: _pickImage,
+                            child: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
                               color: const Color(0xFF0044C9),
@@ -135,6 +312,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               Icons.camera_alt,
                               color: Colors.white,
                               size: 20,
+                            ),
                             ),
                           ),
                         ),
@@ -231,7 +409,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
               const SizedBox(height: 8),
 
-              // Vehicles Section (Mock)
+              // Vehicles Section
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -244,7 +422,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ),
                   ),
                   ElevatedButton.icon(
-                    onPressed: () {},
+                    onPressed: _showAddCarDialog,
                     icon: const Icon(Icons.add, color: Colors.white, size: 16),
                     label: const Text(
                       'Add Car',
@@ -265,56 +443,121 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Mock Car Card
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.directions_car,
-                        color: Color(0xFF334155),
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Tesla Model 3',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
+              Consumer(
+                builder: (context, ref, child) {
+                  final currentUser = ref.watch(userProvider);
+                  if (currentUser == null) return const SizedBox.shrink();
+
+                  final carsAsyncValue = ref.watch(userCarListProvider(currentUser.phoneNo));
+                  
+                  return carsAsyncValue.when(
+                    data: (cars) {
+                      if (cars.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Center(
+                            child: Text('คุณยังไม่มีข้อมูลยานพาหนะ', style: TextStyle(color: Colors.grey)),
+                          ),
+                        );
+                      }
+                      
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: cars.length,
+                        itemBuilder: (context, index) {
+                          final car = cars[index];
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                             ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'สีเทาเข้ม • ABC-1234',
-                            style: TextStyle(color: Colors.grey, fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      onPressed: () {},
-                    ),
-                  ],
-                ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.directions_car,
+                                    color: Color(0xFF334155),
+                                    size: 32,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${car.carBrand} ${car.carModel}',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'สี${car.carColor} • ${car.carPlate}',
+                                        style: const TextStyle(color: Colors.grey, fontSize: 14),
+                                      ),
+                                      if (car.carTypeName != null)
+                                        Text(
+                                          car.carTypeName!,
+                                          style: const TextStyle(color: Color(0xFF0044C9), fontSize: 12),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('ยืนยันการลบ'),
+                                        content: const Text('คุณแน่ใจหรือไม่ว่าต้องการลบยานพาหนะคันนี้?'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context),
+                                            child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey)),
+                                          ),
+                                          TextButton(
+                                            onPressed: () async {
+                                              final scaffoldMessenger = ScaffoldMessenger.of(context);
+                                              final navigator = Navigator.of(context);
+                                              navigator.pop();
+                                              final success = await ref.read(profileControllerProvider.notifier).deleteUserCar(car.userCarId, currentUser.phoneNo);
+                                              if (success && mounted) {
+                                                scaffoldMessenger.showSnackBar(const SnackBar(content: Text('ลบยานพาหนะสำเร็จ')));
+                                              } else if (mounted) {
+                                                scaffoldMessenger.showSnackBar(const SnackBar(content: Text('ลบยานพาหนะไม่สำเร็จ')));
+                                              }
+                                            },
+                                            child: const Text('ลบ', style: TextStyle(color: Colors.red)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (error, stack) => const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูลรถ')),
+                  );
+                },
               ),
 
               const SizedBox(height: 100),
@@ -329,11 +572,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           width: double.infinity,
           height: 54,
           child: ElevatedButton.icon(
-            onPressed: _saveProfile,
-            icon: const Icon(Icons.save_outlined, color: Colors.white),
-            label: const Text(
-              'บันทึกการแก้ไข',
-              style: TextStyle(
+            onPressed: _isUploadingImage ? null : _saveProfile,
+            icon: _isUploadingImage 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(Icons.save_outlined, color: Colors.white),
+            label: Text(
+              _isUploadingImage ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข',
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
