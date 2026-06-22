@@ -9,9 +9,6 @@ import 'package:safeseat_mini/core/models/car_model.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
 import 'package:safeseat_mini/core/services/route_service.dart';
 import 'package:safeseat_mini/features/request_driver/screens/payment_method_screen.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:safeseat_mini/core/constants/api_constants.dart';
 import 'package:safeseat_mini/features/request_driver/screens/waiting_driver_screen.dart';
 
 class RequestDriverDetailsScreen extends ConsumerStatefulWidget {
@@ -174,6 +171,59 @@ class _RequestDriverDetailsScreenState
           ),
         );
       },
+    );
+  }
+
+  void _showInsufficientBalanceDialog(num balance) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            SizedBox(width: 8),
+            Text(
+              'ยอดเงินไม่เพียงพอ',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Text(
+          'ยอดเงินคงเหลือใน SafeSeat Wallet (฿${balance.toStringAsFixed(2)}) '
+          'ไม่เพียงพอสำหรับค่าบริการการเรียกรถครั้งนี้ (฿${_estimatedPrice.toStringAsFixed(0)})\n\n'
+          'กรุณาเปลี่ยนวิธีการชำระเงินเป็นเงินสด หรือเติมเงินเข้าสู่ Wallet ของคุณ',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Change to Cash payment directly
+              setState(() {
+                _paymentMethod = 'เงินสด';
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('เปลี่ยนช่องทางการชำระเงินเป็น เงินสด เรียบร้อยแล้ว')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            child: const Text('ใช้เงินสดแทน'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -724,55 +774,52 @@ class _RequestDriverDetailsScreenState
                       onPressed: _selectedCar == null || _isSubmitting
                           ? null
                           : () async {
+                              final user = ref.read(userProvider);
+                              final balance = user?.walletBalance ?? 0.0;
+                              final isWallet = !_paymentMethod.startsWith('เงินสด');
+                              
+                              if (isWallet && balance < _estimatedPrice) {
+                                _showInsufficientBalanceDialog(balance);
+                                return;
+                              }
+
                               setState(() {
                                 _isSubmitting = true;
                               });
 
                               try {
-                                final url = Uri.parse('${ApiConstants.baseUrl}/api/user/request');
-                                final response = await http.post(
-                                  url,
-                                  headers: {'Content-Type': 'application/json'},
-                                  body: jsonEncode({
-                                    'dropofflatitude': reqState.dropoffLatLng?.latitude,
-                                    'dropofflongitude': reqState.dropoffLatLng?.longitude,
-                                    'isladymode': _ladyMode,
-                                    'note': _remarksController.text.trim(),
-                                    'paymentmethod': _paymentMethod,
-                                    'pickuplatitude': reqState.pickupLatLng?.latitude,
-                                    'pickuplongitude': reqState.pickupLatLng?.longitude,
-                                    'reqdistance': _distanceInKm,
-                                    'requestfee': _estimatedPrice,
-                                    'user_id': phoneNo,
-                                    'user_car_id': _selectedCar?.userCarId,
-                                  }),
-                                );
+                                final requestId = await ref
+                                    .read(requestDriverControllerProvider.notifier)
+                                    .createRequest(
+                                      dropoffLatitude: reqState.dropoffLatLng!.latitude,
+                                      dropoffLongitude: reqState.dropoffLatLng!.longitude,
+                                      isLadyMode: _ladyMode,
+                                      note: _remarksController.text.trim(),
+                                      paymentMethod: _paymentMethod,
+                                      pickupLatitude: reqState.pickupLatLng!.latitude,
+                                      pickupLongitude: reqState.pickupLatLng!.longitude,
+                                      reqDistance: _distanceInKm,
+                                      requestFee: _estimatedPrice,
+                                      userId: phoneNo,
+                                      userCarId: _selectedCar!.userCarId,
+                                    );
 
-                                if (response.statusCode == 201) {
-                                  final data = jsonDecode(response.body);
-                                  final request = data['request'];
-                                  final int? requestId = request != null ? request['requestid'] as int? : null;
-
-                                  if (requestId != null) {
-                                    if (context.mounted) {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (context) => WaitingDriverScreen(
-                                            requestId: requestId,
-                                            pickupAddress: reqState.pickupAddress ?? 'ตำแหน่งปัจจุบัน',
-                                            dropoffAddress: reqState.dropoffAddress ?? 'ปลายทาง',
-                                            carDetails: '${_selectedCar!.carBrand} ${_selectedCar!.carModel}',
-                                            price: _estimatedPrice,
-                                          ),
+                                if (requestId != null) {
+                                  if (context.mounted) {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (context) => WaitingDriverScreen(
+                                          requestId: requestId,
+                                          pickupAddress: reqState.pickupAddress ?? 'ตำแหน่งปัจจุบัน',
+                                          dropoffAddress: reqState.dropoffAddress ?? 'ปลายทาง',
+                                          carDetails: '${_selectedCar!.carBrand} ${_selectedCar!.carModel}',
+                                          price: _estimatedPrice,
                                         ),
-                                      );
-                                    }
-                                  } else {
-                                    throw Exception('ไม่พบไอดีคำขอจากการตอบกลับ');
+                                      ),
+                                    );
                                   }
                                 } else {
-                                  final errData = jsonDecode(response.body);
-                                  throw Exception(errData['error'] ?? 'เกิดข้อผิดพลาดในการสร้างคำขอ');
+                                  throw Exception('ไม่สามารถส่งข้อมูลเพื่อจับคู่กับคนขับได้ กรุณาลองใหม่อีกครั้ง');
                                 }
                               } catch (e) {
                                 if (context.mounted) {

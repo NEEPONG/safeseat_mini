@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:safeseat_mini/core/constants/api_constants.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
+import 'package:safeseat_mini/core/controllers/request_driver_controller.dart';
+import 'package:safeseat_mini/features/request_driver/screens/active_trip_screen.dart';
 
-class WaitingDriverScreen extends StatefulWidget {
+class WaitingDriverScreen extends ConsumerStatefulWidget {
   final int requestId;
   final String pickupAddress;
   final String dropoffAddress;
@@ -22,10 +23,10 @@ class WaitingDriverScreen extends StatefulWidget {
   });
 
   @override
-  State<WaitingDriverScreen> createState() => _WaitingDriverScreenState();
+  ConsumerState<WaitingDriverScreen> createState() => _WaitingDriverScreenState();
 }
 
-class _WaitingDriverScreenState extends State<WaitingDriverScreen> with SingleTickerProviderStateMixin {
+class _WaitingDriverScreenState extends ConsumerState<WaitingDriverScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   Timer? _statusTimer;
   bool _isCancelling = false;
@@ -56,30 +57,26 @@ class _WaitingDriverScreenState extends State<WaitingDriverScreen> with SingleTi
 
   Future<void> _checkRequestStatus() async {
     try {
-      final url = Uri.parse('${ApiConstants.baseUrl}/api/user/request/${widget.requestId}');
-      final response = await http.get(url, headers: {'Content-Type': 'application/json'});
+      final request = await ref
+          .read(requestDriverControllerProvider.notifier)
+          .checkRequestStatus(widget.requestId);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final request = data['request'];
-        if (request != null) {
-          final status = request['requeststatus'] as String;
-          if (status != 'pending') {
-            _statusTimer?.cancel();
-            setState(() {
-              _statusMessage = 'พบคนขับและรับงานเรียบร้อยแล้ว!';
-              _acceptedDriverInfo = {
-                'status': status,
-                'leader': request['leader'],
-                'follower': request['follower'],
-              };
-            });
-            _showSuccessDialog();
-          }
+      if (request != null) {
+        final status = request['requeststatus'] as String;
+        if (status != 'pending') {
+          _statusTimer?.cancel();
+          setState(() {
+            _statusMessage = 'พบคนขับและรับงานเรียบร้อยแล้ว!';
+            _acceptedDriverInfo = {
+              'status': status,
+              'leader': request['leader'],
+              'follower': request['follower'],
+            };
+          });
+          _showSuccessDialog();
         }
       }
     } catch (e) {
-      // Fail silently
       debugPrint('Error polling request status: $e');
     }
   }
@@ -91,10 +88,11 @@ class _WaitingDriverScreenState extends State<WaitingDriverScreen> with SingleTi
     });
 
     try {
-      final url = Uri.parse('${ApiConstants.baseUrl}/api/user/request/${widget.requestId}');
-      final response = await http.delete(url, headers: {'Content-Type': 'application/json'});
+      final success = await ref
+          .read(requestDriverControllerProvider.notifier)
+          .cancelRequest(widget.requestId);
 
-      if (response.statusCode == 200) {
+      if (success) {
         _statusTimer?.cancel();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -103,7 +101,7 @@ class _WaitingDriverScreenState extends State<WaitingDriverScreen> with SingleTi
           Navigator.of(context).pop(); // Go back to details
         }
       } else {
-        throw Exception('Failed to cancel request');
+        throw Exception('Failed to cancel request on server');
       }
     } catch (e) {
       if (mounted) {
@@ -191,9 +189,27 @@ class _WaitingDriverScreenState extends State<WaitingDriverScreen> with SingleTi
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop(); // pop dialog
-              Navigator.of(context).pop(); // pop waiting
-              Navigator.of(context).pop(); // pop details
-              Navigator.of(context).pop(); // pop map (return to home)
+              
+              final reqState = ref.read(requestDriverControllerProvider);
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => ActiveTripScreen(
+                    requestId: widget.requestId,
+                    pickupAddress: widget.pickupAddress,
+                    dropoffAddress: widget.dropoffAddress,
+                    pickupLatLng: reqState.pickupLatLng ?? const LatLng(18.8972, 99.0112),
+                    dropoffLatLng: reqState.dropoffLatLng ?? const LatLng(18.8972, 99.0112),
+                    carDetails: widget.carDetails,
+                    price: widget.price,
+                    initialRequestData: {
+                      'requeststatus': _acceptedDriverInfo?['status'],
+                      'leader': _acceptedDriverInfo?['leader'],
+                      'follower': _acceptedDriverInfo?['follower'],
+                    },
+                  ),
+                ),
+                (route) => route.isFirst,
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
