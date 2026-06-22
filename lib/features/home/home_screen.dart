@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
-import 'package:safeseat_mini/core/controllers/user_controller.dart';
+import 'package:safeseat_mini/controllers/user_controller.dart';
 import 'package:safeseat_mini/features/request_driver/screens/request_driver_screen.dart';
 
 class HomeScreen extends ConsumerWidget {

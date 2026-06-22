@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:safeseat_mini/core/controllers/request_driver_controller.dart';
-import 'package:safeseat_mini/core/controllers/profile_controller.dart';
-import 'package:safeseat_mini/core/controllers/user_controller.dart';
-import 'package:safeseat_mini/core/models/car_model.dart';
+import 'package:safeseat_mini/controllers/request_driver_controller.dart';
+import 'package:safeseat_mini/controllers/profile_controller.dart';
+import 'package:safeseat_mini/controllers/user_controller.dart';
+import 'package:safeseat_mini/data/models/car_model.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
 import 'package:safeseat_mini/core/services/route_service.dart';
 import 'package:safeseat_mini/features/request_driver/screens/payment_method_screen.dart';
@@ -780,6 +780,13 @@ class _RequestDriverDetailsScreenState
                               
                               if (isWallet && balance < _estimatedPrice) {
                                 _showInsufficientBalanceDialog(balance);
+                                return;
+                              }
+
+                              if (reqState.pickupLatLng == null || reqState.dropoffLatLng == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('กรุณาระบุจุดรับและจุดส่งให้เรียบร้อยก่อนเรียกรถ')),
+                                );
                                 return;
                               }
 

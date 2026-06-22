@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:safeseat_mini/core/models/user_model.dart';
+import 'package:safeseat_mini/data/models/user_model.dart';
 
 class UserController extends Notifier<UserModel?> {
   @override

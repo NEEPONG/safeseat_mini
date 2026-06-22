@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
-import 'package:safeseat_mini/core/controllers/request_driver_controller.dart';
+import 'package:safeseat_mini/controllers/request_driver_controller.dart';
 import 'package:safeseat_mini/features/request_driver/screens/active_trip_screen.dart';
+import 'package:safeseat_mini/data/models/request_driver_model.dart';
 
 class WaitingDriverScreen extends ConsumerStatefulWidget {
   final int requestId;
@@ -31,7 +32,7 @@ class _WaitingDriverScreenState extends ConsumerState<WaitingDriverScreen> with 
   Timer? _statusTimer;
   bool _isCancelling = false;
   String _statusMessage = 'กำลังค้นหาคนขับรถที่ดีที่สุดสำหรับคุณ...';
-  Map<String, dynamic>? _acceptedDriverInfo;
+  RequestDriverModel? _acceptedRequest;
 
   @override
   void initState() {
@@ -62,16 +63,12 @@ class _WaitingDriverScreenState extends ConsumerState<WaitingDriverScreen> with 
           .checkRequestStatus(widget.requestId);
 
       if (request != null) {
-        final status = request['requeststatus'] as String;
+        final status = request.requestStatus;
         if (status != 'pending') {
           _statusTimer?.cancel();
           setState(() {
             _statusMessage = 'พบคนขับและรับงานเรียบร้อยแล้ว!';
-            _acceptedDriverInfo = {
-              'status': status,
-              'leader': request['leader'],
-              'follower': request['follower'],
-            };
+            _acceptedRequest = request;
           });
           _showSuccessDialog();
         }
@@ -116,10 +113,10 @@ class _WaitingDriverScreenState extends ConsumerState<WaitingDriverScreen> with 
   }
 
   void _showSuccessDialog() {
-    final leader = _acceptedDriverInfo?['leader'];
-    final leaderName = leader != null ? '${leader['firstname']} ${leader['lastname']}' : 'คนขับของ SafeSeat';
-    final licensePlate = leader != null && leader['license_plate'] != null
-        ? leader['license_plate']
+    final leader = _acceptedRequest?.leader;
+    final leaderName = leader != null ? '${leader.firstname} ${leader.lastname}' : 'คนขับของ SafeSeat';
+    final licensePlate = leader != null && leader.licensePlate != null
+        ? leader.licensePlate!
         : 'ไม่ระบุ';
 
     showDialog(
@@ -201,11 +198,7 @@ class _WaitingDriverScreenState extends ConsumerState<WaitingDriverScreen> with 
                     dropoffLatLng: reqState.dropoffLatLng ?? const LatLng(18.8972, 99.0112),
                     carDetails: widget.carDetails,
                     price: widget.price,
-                    initialRequestData: {
-                      'requeststatus': _acceptedDriverInfo?['status'],
-                      'leader': _acceptedDriverInfo?['leader'],
-                      'follower': _acceptedDriverInfo?['follower'],
-                    },
+                    initialRequestData: _acceptedRequest,
                   ),
                 ),
                 (route) => route.isFirst,

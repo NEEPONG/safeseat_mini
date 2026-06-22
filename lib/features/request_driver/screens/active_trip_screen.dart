@@ -5,10 +5,11 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
-import 'package:safeseat_mini/core/controllers/request_driver_controller.dart';
-import 'package:safeseat_mini/core/controllers/profile_controller.dart';
-import 'package:safeseat_mini/core/controllers/user_controller.dart';
+import 'package:safeseat_mini/controllers/request_driver_controller.dart';
+import 'package:safeseat_mini/controllers/profile_controller.dart';
+import 'package:safeseat_mini/controllers/user_controller.dart';
 import 'package:safeseat_mini/core/services/route_service.dart';
+import 'package:safeseat_mini/data/models/request_driver_model.dart';
 
 class ActiveTripScreen extends ConsumerStatefulWidget {
   final int requestId;
@@ -18,7 +19,7 @@ class ActiveTripScreen extends ConsumerStatefulWidget {
   final LatLng dropoffLatLng;
   final String carDetails;
   final double price;
-  final Map<String, dynamic>? initialRequestData;
+  final RequestDriverModel? initialRequestData;
 
   const ActiveTripScreen({
     super.key,
@@ -44,8 +45,8 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
   LatLng? _driverLatLng;
   
   String _currentStatus = 'going to pickup';
-  Map<String, dynamic>? _leaderDriver;
-  Map<String, dynamic>? _followerDriver;
+  DriverProfileModel? _leaderDriver;
+  DriverProfileModel? _followerDriver;
   double _tripPrice = 0.0;
 
   @override
@@ -71,20 +72,18 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
     super.dispose();
   }
 
-  void _parseRequestData(Map<String, dynamic> data) {
+  void _parseRequestData(RequestDriverModel data) {
     setState(() {
-      _currentStatus = data['requeststatus'] as String? ?? _currentStatus;
-      _leaderDriver = data['leader'] as Map<String, dynamic>?;
-      _followerDriver = data['follower'] as Map<String, dynamic>?;
-      if (data['requestfee'] != null) {
-        _tripPrice = (data['requestfee'] as num).toDouble();
-      }
-
+      _currentStatus = data.requestStatus;
+      _leaderDriver = data.leader;
+      _followerDriver = data.follower;
+      _tripPrice = data.requestFee;
+ 
       // Check if buddyteam coordinates exist
-      final buddyteam = data['buddyteam'] as Map<String, dynamic>?;
+      final buddyteam = data.buddyTeam;
       if (buddyteam != null) {
-        final double? lat = (buddyteam['currentloclat'] as num?)?.toDouble();
-        final double? lng = (buddyteam['currentloclng'] as num?)?.toDouble();
+        final double? lat = buddyteam.currentLocLat;
+        final double? lng = buddyteam.currentLocLng;
         
         if (lat != null && lng != null && lat != 0.0 && lng != 0.0) {
           _driverLatLng = LatLng(lat, lng);
@@ -562,7 +561,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'คนขับหลัก: ${_leaderDriver!['firstname']} ${_leaderDriver!['lastname']}',
+                                          'คนขับหลัก: ${_leaderDriver!.firstname} ${_leaderDriver!.lastname}',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14,
@@ -570,7 +569,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                                           ),
                                         ),
                                         Text(
-                                          'ทะเบียนรถไล่ตาม: ${_leaderDriver!['license_plate'] ?? 'ไม่ระบุ'}',
+                                          'ทะเบียนรถไล่ตาม: ${_leaderDriver!.licensePlate ?? 'ไม่ระบุ'}',
                                           style: const TextStyle(
                                             fontSize: 12,
                                             color: Color(0xFF64748B),
@@ -583,8 +582,8 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                                     icon: const Icon(Icons.phone, color: Colors.green),
                                     onPressed: () => _showCallDialog(
                                       'คนขับหลัก',
-                                      '${_leaderDriver!['firstname']} ${_leaderDriver!['lastname']}',
-                                      _leaderDriver!['phone_no'],
+                                      '${_leaderDriver!.firstname} ${_leaderDriver!.lastname}',
+                                      _leaderDriver!.phoneNo,
                                     ),
                                   ),
                                 ],
@@ -608,7 +607,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            'คนขับรถผู้ช่วย: ${_followerDriver!['firstname']} ${_followerDriver!['lastname']}',
+                                            'คนขับรถผู้ช่วย: ${_followerDriver!.firstname} ${_followerDriver!.lastname}',
                                             style: const TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 14,
@@ -629,8 +628,8 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                                       icon: const Icon(Icons.phone, color: Colors.green),
                                       onPressed: () => _showCallDialog(
                                         'คนขับผู้ช่วย',
-                                        '${_followerDriver!['firstname']} ${_followerDriver!['lastname']}',
-                                        _followerDriver!['phone_no'],
+                                        '${_followerDriver!.firstname} ${_followerDriver!.lastname}',
+                                        _followerDriver!.phoneNo,
                                       ),
                                     ),
                                   ],

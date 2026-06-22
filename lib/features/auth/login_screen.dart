@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
 import 'package:safeseat_mini/features/auth/register_screen.dart';
 import 'package:safeseat_mini/features/main_layout/main_layout.dart';
-import 'package:safeseat_mini/core/controllers/auth_controller.dart';
+import 'package:safeseat_mini/controllers/auth_controller.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});

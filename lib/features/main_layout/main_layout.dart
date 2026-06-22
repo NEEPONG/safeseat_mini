@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
 import 'package:safeseat_mini/features/home/home_screen.dart';
 import 'package:safeseat_mini/features/profile/profile_screen.dart';
-import 'package:safeseat_mini/core/controllers/user_controller.dart';
+import 'package:safeseat_mini/controllers/user_controller.dart';
 
 class MainLayout extends ConsumerStatefulWidget {
   const MainLayout({super.key});

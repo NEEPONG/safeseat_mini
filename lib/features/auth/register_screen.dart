@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
 import 'package:safeseat_mini/core/utils/validators.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:safeseat_mini/core/controllers/auth_controller.dart';
+import 'package:safeseat_mini/controllers/auth_controller.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});

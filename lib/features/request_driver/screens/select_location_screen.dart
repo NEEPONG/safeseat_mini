@@ -5,7 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
-import 'package:safeseat_mini/core/controllers/request_driver_controller.dart';
+import 'package:safeseat_mini/controllers/request_driver_controller.dart';
 import 'package:safeseat_mini/core/constants/api_constants.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';

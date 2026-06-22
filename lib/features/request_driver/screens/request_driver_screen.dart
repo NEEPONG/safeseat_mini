@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:safeseat_mini/core/controllers/request_driver_controller.dart';
+import 'package:safeseat_mini/controllers/request_driver_controller.dart';
 import 'package:safeseat_mini/features/request_driver/screens/select_location_screen.dart';
 import 'package:safeseat_mini/features/request_driver/screens/request_driver_details_screen.dart';
 import 'package:safeseat_mini/core/theme/app_theme.dart';
