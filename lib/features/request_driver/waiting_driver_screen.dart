@@ -64,7 +64,7 @@ class _WaitingDriverScreenState extends ConsumerState<WaitingDriverScreen> with 
 
       if (request != null) {
         final status = request.requestStatus;
-        if (status != 'pending') {
+        if (status != 'กำลังค้นหาคนขับ') {
           _statusTimer?.cancel();
           setState(() {
             _statusMessage = 'พบคนขับและรับงานเรียบร้อยแล้ว!';

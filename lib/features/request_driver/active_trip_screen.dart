@@ -92,7 +92,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
     });
 
     // If trip completed, stop polling and refresh wallet
-    if (_currentStatus.toLowerCase() == 'completed' || _currentStatus == 'เสร็จสิ้น') {
+    if (_currentStatus == 'เสร็จสิ้น') {
       _statusTimer?.cancel();
       _refreshUserWallet();
     }
@@ -234,9 +234,17 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
 
   // Map status string to Thai display text and color/icon
   Map<String, dynamic> _getStatusUI() {
-    final status = _currentStatus.toLowerCase();
+    final status = _currentStatus;
     
-    if (status == 'going to pickup' || status == 'กำลังไปรับ') {
+    if (status == 'กำลังค้นหาคนขับ') {
+      return {
+        'title': 'กำลังค้นหาคนขับ',
+        'desc': 'ระบบกำลังค้นหาคู่หูคนขับที่อยู่ใกล้ที่สุดสำหรับคุณ',
+        'color': const Color(0xFF94A3B8),
+        'icon': Icons.location_searching,
+        'badgeColor': const Color(0xFFF1F5F9),
+      };
+    } else if (status == 'กำลังไปรับ') {
       return {
         'title': 'คนขับกำลังมารับคุณ',
         'desc': 'คนขับหลักและรถผู้ช่วยกำลังเดินทางไปยังจุดรับของคุณ',
@@ -244,15 +252,15 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
         'icon': Icons.directions_run_outlined,
         'badgeColor': const Color(0xFFDBEAFE),
       };
-    } else if (status == 'arrived' || status == 'ถึงจุดรับแล้ว') {
+    } else if (status == 'ถึงจุดนัดหมาย') {
       return {
-        'title': 'คนขับมาถึงจุดรับแล้ว',
-        'desc': 'คนขับเดินทางมาถึงจุดรับแล้ว กรุณาไปพบคนขับที่จุดจอดรถ',
+        'title': 'คนขับมาถึงจุดนัดหมายแล้ว',
+        'desc': 'คนขับเดินทางมาถึงจุดนัดหมายแล้ว กรุณาไปพบคนขับที่จุดจอดรถ',
         'color': const Color(0xFFD97706),
         'icon': Icons.pin_drop,
         'badgeColor': const Color(0xFFFEF3C7),
       };
-    } else if (status == 'in_progress' || status == 'going to dropoff' || status == 'ระหว่างเดินทาง') {
+    } else if (status == 'กำลังเดินทาง') {
       return {
         'title': 'กำลังนำทางไปปลายทาง',
         'desc': 'อยู่ระหว่างการเดินทางไปยังจุดหมายปลายทางของคุณอย่างปลอดภัย',
@@ -260,7 +268,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
         'icon': Icons.local_taxi,
         'badgeColor': const Color(0xFFF3E8FF),
       };
-    } else if (status == 'completed' || status == 'เสร็จสิ้น') {
+    } else if (status == 'เสร็จสิ้น') {
       return {
         'title': 'การเดินทางเสร็จสิ้น',
         'desc': 'ถึงจุดหมายปลายทางเรียบร้อยแล้ว ขอบคุณที่เดินทางกับเรา',
@@ -283,7 +291,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
   @override
   Widget build(BuildContext context) {
     final statusUI = _getStatusUI();
-    final isTripCompleted = _currentStatus.toLowerCase() == 'completed' || _currentStatus == 'เสร็จสิ้น';
+    final isTripCompleted = _currentStatus == 'เสร็จสิ้น';
 
     final List<Marker> markers = [
       // Pickup Pin
