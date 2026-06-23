@@ -1,9 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
-import 'package:safeseat_mini/core/constants/api_constants.dart';
+import 'package:safeseat_mini/data/models/request_driver_model.dart';
+import 'package:safeseat_mini/data/repositories/request_driver_repository.dart';
 
 class RequestDriverState {
   final String? pickupAddress;
@@ -77,32 +76,22 @@ class RequestDriverController extends Notifier<RequestDriverState> {
   }) async {
     state = state.copyWith(isLoading: true);
     try {
-      final url = Uri.parse('${ApiConstants.baseUrl}/api/user/request');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'dropofflatitude': dropoffLatitude,
-          'dropofflongitude': dropoffLongitude,
-          'isladymode': isLadyMode,
-          'note': note,
-          'paymentmethod': paymentMethod,
-          'pickuplatitude': pickupLatitude,
-          'pickuplongitude': pickupLongitude,
-          'reqdistance': reqDistance,
-          'requestfee': requestFee,
-          'user_id': userId,
-          'user_car_id': userCarId,
-        }),
+      final repository = ref.read(requestDriverRepositoryProvider);
+      final requestId = await repository.createRequest(
+        dropoffLatitude: dropoffLatitude,
+        dropoffLongitude: dropoffLongitude,
+        isLadyMode: isLadyMode,
+        note: note,
+        paymentMethod: paymentMethod,
+        pickupLatitude: pickupLatitude,
+        pickupLongitude: pickupLongitude,
+        reqDistance: reqDistance,
+        requestFee: requestFee,
+        userId: userId,
+        userCarId: userCarId,
       );
-
-      if (response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        final request = data['request'];
-        final int? requestId = request != null ? request['requestid'] as int? : null;
-        state = state.copyWith(isLoading: false);
-        return requestId;
-      }
+      state = state.copyWith(isLoading: false);
+      return requestId;
     } catch (e) {
       debugPrint('Error creating request: $e');
     }
@@ -111,15 +100,10 @@ class RequestDriverController extends Notifier<RequestDriverState> {
   }
 
   /// Polls the backend to check the request status and assigned driver info
-  Future<Map<String, dynamic>?> checkRequestStatus(int requestId) async {
+  Future<RequestDriverModel?> checkRequestStatus(int requestId) async {
     try {
-      final url = Uri.parse('${ApiConstants.baseUrl}/api/user/request/$requestId');
-      final response = await http.get(url, headers: {'Content-Type': 'application/json'});
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['request'] as Map<String, dynamic>?;
-      }
+      final repository = ref.read(requestDriverRepositoryProvider);
+      return await repository.checkRequestStatus(requestId);
     } catch (e) {
       debugPrint('Error checking request status: $e');
     }
@@ -129,13 +113,8 @@ class RequestDriverController extends Notifier<RequestDriverState> {
   /// Deletes the request from the backend
   Future<bool> cancelRequest(int requestId) async {
     try {
-      final url = Uri.parse('${ApiConstants.baseUrl}/api/user/request/$requestId');
-      final response = await http.delete(url, headers: {'Content-Type': 'application/json'});
-
-      if (response.statusCode == 200) {
-        clearRequest();
-        return true;
-      }
+      final repository = ref.read(requestDriverRepositoryProvider);
+      return await repository.cancelRequest(requestId);
     } catch (e) {
       debugPrint('Error canceling request: $e');
     }
@@ -147,3 +126,4 @@ final requestDriverControllerProvider =
     NotifierProvider<RequestDriverController, RequestDriverState>(() {
   return RequestDriverController();
 });
+
